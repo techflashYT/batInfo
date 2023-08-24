@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#undef __cplusplus
 #include <stdbool.h>
 
 static inline void batErr() {
