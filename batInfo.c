@@ -101,7 +101,16 @@ int main() {
 
 	// step 3: print it
 	currentNow /= 1000;
-	printf("BAT CURRENT: %s%s%d%s\x1b[0m\r\n", pre, negative ? "-" : "", amps ? currentNow / 1000 : currentNow, amps ? "A" : "mA");
+
+	char str[48];
+	sprintf(str, "BAT CURRENT: %s%s%.2f", pre, negative ? "-" : "", amps ? (double)((double)currentNow / (double)1000) : (double)currentNow);
+
+	int l = strlen(str);
+	if (str[l-1] == '0' && str[l-2] == '0' && str[l-3] == '.') {
+		str[strlen(str) - 3] = '\0';
+	}
+
+	printf("%s%s\x1b[0m\r\n", str, amps ? "A" : "mA");
 
 	return 0;
 }
