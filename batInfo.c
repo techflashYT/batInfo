@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 static inline void batErr() {
 	perror("Failed to find the battery");
@@ -20,6 +21,7 @@ int main() {
 	char basePath[100] = {0};
 	char tmpPath[100] = {0};
 	fgets(basePath, sizeof(basePath), bat);
+	pclose(bat);
 
 	if (basePath[0] == '\0') {batErr();}
 
@@ -30,7 +32,7 @@ int main() {
 		perror("Failed to open capacity file!");
 		return 1;
 	}
-	
+
 	int percent;
 	fscanf(fh, "%d", &percent);
 	fclose(fh);
@@ -50,7 +52,7 @@ int main() {
 	modPath(tmpPath, basePath, "/status");
 	fh = fopen(tmpPath, "r");
 	if (fh == NULL) {
-		printf("Failed to open status file!\n");
+		perror("Failed to open status file!");
 		return 1;
 	}
 	char statusStr[20];
@@ -61,7 +63,8 @@ int main() {
 	else if (strcmp(statusStr, "Discharging") == 0) {pre = "\e[1;31m";}
 	else                                            {pre = "\e[1;33m";}
 
-	fh = fopen(basePath, "r");
+	modPath(tmpPath, basePath, "/current_now");
+	fh = fopen(tmpPath, "r");
 	if (fh == NULL) {
 		printf("Failed to open current file!\n");
 		return 1;
@@ -72,6 +75,33 @@ int main() {
 
 	if (currentNow < 1000000 && currentNow > 0) {pre = "\e[1;33mSlow ";}
 	printf("BAT STATUS : %s%s\e[0m\n", pre, statusStr);
+
+	// print the battery current nicely
+	// step 1: reverse the negative (and log it for later) to make the math easier
+
+	pre = "\e[1;31m";
+	// currentNow = 1000000;
+	bool negative = false;
+	bool amps = false;
+	if (currentNow < 0) {currentNow = -currentNow; negative = true;}
+
+	// step 1: detect if it is more than 1A
+
+	if (currentNow > 1000000) {amps = true;}
+
+	// step 2: colors
+	if (!negative) {
+		// > 1000mA
+		if (currentNow >= 1000000) {pre = "\e[1;33m";}
+		// > 1500mA
+		if (currentNow >= 1500000) {pre = "\e[1;32m";}
+		// > 2000mA
+		if (currentNow >= 2000000) {pre = "\e[32m";}
+	}
+
+	// step 3: print it
+	currentNow /= 1000;
+	printf("BAT CURRENT: %s%s%d%s\x1b[0m\r\n", pre, negative ? "-" : "", amps ? currentNow / 1000 : currentNow, amps ? "A" : "mA");
 
 	return 0;
 }
