@@ -8,30 +8,32 @@ static inline void batErr() {
 	exit(1);
 }
 
+static inline void modPath(char *tmpPath, char *basePath, char *new) {
+	strcpy(tmpPath, basePath);
+	strcat(tmpPath, new);
+}
+
 int main() {
 	FILE* bat = popen("findbat", "r");
-	if (bat == NULL) {
-		batErr();
-	}
+	if (bat == NULL) {batErr();}
+
 	char basePath[100] = {0};
 	char tmpPath[100] = {0};
 	fgets(basePath, sizeof(basePath), bat);
 
+	if (basePath[0] == '\0') {batErr();}
 
-	if (basePath[0] == '\0') {
-		batErr();
-	}
+	modPath(tmpPath, basePath, "/capacity");
 
-	strcpy(tmpPath, basePath);
-	strcat(tmpPath, "/capacity");
-	FILE* capacity = fopen(tmpPath, "r");
-	if (capacity == NULL) {
+	FILE* fh = fopen(tmpPath, "r");
+	if (fh == NULL) {
 		perror("Failed to open capacity file!");
 		return 1;
 	}
+	
 	int percent;
-	fscanf(capacity, "%d", &percent);
-	fclose(capacity);
+	fscanf(fh, "%d", &percent);
+	fclose(fh);
 
 	const char* pre = "";
 	const char* post = "\e[0m";
@@ -39,53 +41,36 @@ int main() {
 		pre = "\e[1;31m!!! ";
 		post = " !!! \e[0m";
 	}
-	else if (percent < 45) {
-		pre = "\e[31m";
-	}
-	else if (percent < 65) {
-		pre = "\e[1;33m";
-	}
-	else if (percent < 75) {
-		pre = "\e[1;32m";
-	}
-	else if (percent >= 75) {
-		pre = "\e[32m";
-	}
+	else if (percent <  45) {pre = "\e[31m";}
+	else if (percent <  65) {pre = "\e[1;33m";}
+	else if (percent <  75) {pre = "\e[1;32m";}
+	else if (percent >= 75) {pre = "\e[32m";}
 	printf("BAT PERCENT: %s%d%%%s\n", pre, percent, post);
 
-	strcpy(tmpPath, basePath);
-	strcat(tmpPath, "/status");
-	FILE* status = fopen(tmpPath, "r");
-	if (status == NULL) {
+	modPath(tmpPath, basePath, "/status");
+	fh = fopen(tmpPath, "r");
+	if (fh == NULL) {
 		printf("Failed to open status file!\n");
 		return 1;
 	}
 	char statusStr[20];
-	fscanf(status, "%s", statusStr);
-	fclose(status);
+	fscanf(fh, "%s", statusStr);
+	fclose(fh);
 
-	if (strcmp(statusStr, "Charging") == 0) {
-		pre = "\e[32m";
-	}
-	else if (strcmp(statusStr, "Discharging") == 0) {
-		pre = "\e[1;31m";
-	}
-	else {
-		pre = "\e[1;33m";
-	}
+	if      (strcmp(statusStr, "Charging")    == 0) {pre = "\e[32m";}
+	else if (strcmp(statusStr, "Discharging") == 0) {pre = "\e[1;31m";}
+	else                                            {pre = "\e[1;33m";}
 
-	FILE* current = fopen(basePath, "r");
-	if (current == NULL) {
+	fh = fopen(basePath, "r");
+	if (fh == NULL) {
 		printf("Failed to open current file!\n");
 		return 1;
 	}
 	int currentNow;
-	fscanf(current, "%d", &currentNow);
-	fclose(current);
+	fscanf(fh, "%d", &currentNow);
+	fclose(fh);
 
-	if (currentNow < 1000000 && currentNow > 0) {
-		pre = "\e[1;33mSlow ";
-	}
+	if (currentNow < 1000000 && currentNow > 0) {pre = "\e[1;33mSlow ";}
 	printf("BAT STATUS : %s%s\e[0m\n", pre, statusStr);
 
 	return 0;
