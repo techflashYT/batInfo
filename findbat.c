@@ -7,7 +7,7 @@
 int main() {
 	DIR *dir;
 	struct dirent *entry;
-	char path[256];
+	char path[289];
 
 	dir = opendir("/sys/class/power_supply");
 	if (dir == NULL) {
