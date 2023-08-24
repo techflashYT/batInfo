@@ -13,15 +13,18 @@ int main() {
 	if (bat == NULL) {
 		batErr();
 	}
-	char path[100] = {0};
-	fgets(path, sizeof(path), bat);
+	char basePath[100] = {0};
+	char tmpPath[100] = {0};
+	fgets(basePath, sizeof(basePath), bat);
 
 
-	if (path[0] == '\0') {
+	if (basePath[0] == '\0') {
 		batErr();
 	}
 
-	FILE* capacity = fopen(path, "r");
+	strcpy(tmpPath, basePath);
+	strcat(tmpPath, "/capacity");
+	FILE* capacity = fopen(tmpPath, "r");
 	if (capacity == NULL) {
 		perror("Failed to open capacity file!");
 		return 1;
@@ -30,31 +33,29 @@ int main() {
 	fscanf(capacity, "%d", &percent);
 	fclose(capacity);
 
-	const char* pre;
-	const char* post;
+	const char* pre = "";
+	const char* post = "\e[0m";
 	if (percent < 35) {
-		pre = "\033[1;31m!!! ";
-		post = " !!! \033[0m";
+		pre = "\e[1;31m!!! ";
+		post = " !!! \e[0m";
 	}
 	else if (percent < 45) {
-		pre = "\033[31m";
-		post = "\033[0m";
+		pre = "\e[31m";
 	}
 	else if (percent < 65) {
-		pre = "\033[1;33m";
-		post = "\033[0m";
+		pre = "\e[1;33m";
 	}
 	else if (percent < 75) {
-		pre = "\033[1;32m";
-		post = "\033[0m";
+		pre = "\e[1;32m";
 	}
 	else if (percent >= 75) {
-		pre = "\033[32m";
-		post = "\033[0m";
+		pre = "\e[32m";
 	}
-	printf("BAT PERCENT: %s%d%s\n", pre, percent, post);
+	printf("BAT PERCENT: %s%d%%%s\n", pre, percent, post);
 
-	FILE* status = fopen(path, "r");
+	strcpy(tmpPath, basePath);
+	strcat(tmpPath, "/status");
+	FILE* status = fopen(tmpPath, "r");
 	if (status == NULL) {
 		printf("Failed to open status file!\n");
 		return 1;
@@ -64,16 +65,16 @@ int main() {
 	fclose(status);
 
 	if (strcmp(statusStr, "Charging") == 0) {
-		pre = "\033[32m";
+		pre = "\e[32m";
 	}
 	else if (strcmp(statusStr, "Discharging") == 0) {
-		pre = "\033[1;31m";
+		pre = "\e[1;31m";
 	}
 	else {
-		pre = "\033[1;33m";
+		pre = "\e[1;33m";
 	}
 
-	FILE* current = fopen(path, "r");
+	FILE* current = fopen(basePath, "r");
 	if (current == NULL) {
 		printf("Failed to open current file!\n");
 		return 1;
@@ -83,9 +84,9 @@ int main() {
 	fclose(current);
 
 	if (currentNow < 1000000 && currentNow > 0) {
-		pre = "\033[1;33mSlow ";
+		pre = "\e[1;33mSlow ";
 	}
-	printf("BAT STATUS : %s%s\033[0m\n", pre, statusStr);
+	printf("BAT STATUS : %s%s\e[0m\n", pre, statusStr);
 
 	return 0;
 }
