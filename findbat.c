@@ -20,7 +20,7 @@ int main() {
 			snprintf(path, sizeof(path), "/sys/class/power_supply/%s/capacity", entry->d_name);
 			if (access(path, F_OK) == 0) {
 				// we found one with capacity
-				printf("%s\n", entry->d_name);
+				printf("/sys/class/power_supply/%s", entry->d_name);
 				closedir(dir);
 				exit(0);
 			}
