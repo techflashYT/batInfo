@@ -23,18 +23,20 @@ int main() {
 			if (access(path, F_OK) == 0) {
 				// we found one with type
 				int fd = open(path, O_RDONLY);
+				char type[256];
+				memset(type, 0, sizeof(type));
+
 				if (fd < 0) {
 					perror("ERROR: Failed to open type");
 					exit(1);
 				}
-				char type[256];
 				if (read(fd, type, sizeof(type)) < 0) {
 					perror("ERROR: Failed to read type");
 					exit(1);
 				}
 				close(fd);
 
-				if (strcmp(type, "Battery\n") == 0) {
+				if (strncmp(type, "Battery\n", sizeof(type) - 1) == 0) {
 					goto goodbat;
 				}
 			}
