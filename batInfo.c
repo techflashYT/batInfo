@@ -4,12 +4,6 @@
 #undef __cplusplus
 #include <stdbool.h>
 
-static inline void batErr() {
-	perror("Failed to find the battery");
-	fputs("Please look for any errors above. Likely 'findbat' just isn't installed, or your computer doesn't have a battery.\r\n", stderr);
-	exit(1);
-}
-
 static inline void modPath(char *tmpPath, char *basePath, char *new) {
 	strcpy(tmpPath, basePath);
 	strcat(tmpPath, new);
@@ -17,14 +11,22 @@ static inline void modPath(char *tmpPath, char *basePath, char *new) {
 
 int main() {
 	FILE* bat = popen("findbat", "r");
-	if (bat == NULL) {batErr();}
+	if (bat == NULL || bat == (FILE *)-1) {
+		perror("Failed to launch findbat");
+		fputs("Please look for any errors above. Likely 'findbat' just isn't installed, or it's not in your path.\r\n", stderr);
+		exit(1);
+	}
 
 	char basePath[100] = {0};
 	char tmpPath[100] = {0};
 	fgets(basePath, sizeof(basePath), bat);
 	pclose(bat);
 
-	if (basePath[0] == '\0') {batErr();}
+	if (basePath[0] == '\0') {
+		fputs("findbat returned nothind!\r\n", stderr);
+		fputs("Please look for any errors above. Likely your computer doesn't have a battery.\r\n", stderr);
+		exit(1);
+	}
 
 	modPath(tmpPath, basePath, "/capacity");
 
