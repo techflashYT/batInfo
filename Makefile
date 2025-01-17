@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -g
+CFLAGS=-Wall -Wextra -Wno-format-truncation -Wno-sign-compare -g
 
 all: batInfo findbat
 
@@ -15,6 +15,6 @@ findbat: bin/findbat
 bin/findbat: findbat.c
 	@mkdir -p bin
 	$(CC) $(CFLAGS) -o bin/findbat findbat.c
-	
+
 clean:
 	rm -rf bin

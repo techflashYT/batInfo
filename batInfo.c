@@ -1,119 +1,162 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#undef __cplusplus
 #include <stdbool.h>
+#include <limits.h>
 
-static inline void modPath(char *tmpPath, char *basePath, char *new) {
-	strcpy(tmpPath, basePath);
-	strcat(tmpPath, new);
+#define MAX_PATH_LENGTH 256  // Adjust size to accommodate longer paths
+
+static const char* pre = "";
+static const char* post = "\e[0m";
+
+// Helper function to read an integer value from a file
+static int readBatteryFile(const char* path, int* value) {
+    FILE* file = fopen(path, "r");
+    if (!file) {
+        perror("Failed to open file");
+        return -1;
+    }
+    if (fscanf(file, "%d", value) != 1) {
+        fprintf(stderr, "Failed to read value from %s\n", path);
+        fclose(file);
+        return -1;
+    }
+    fclose(file);
+    return 0;
+}
+
+// Helper function to calculate watts if power_now is unavailable
+static double calculateWatts(int current, int voltage) {
+    return (current / 1000000.0) * (voltage / 1000000.0); // Convert µA and µV to A and V
 }
 
 int main() {
-	FILE* bat = popen("findbat", "r");
-	if (bat == NULL || bat == (FILE *)-1) {
-		perror("Failed to launch findbat");
-		fputs("Please look for any errors above. Likely 'findbat' just isn't installed, or it's not in your path.\r\n", stderr);
-		exit(1);
-	}
+    char basePath[MAX_PATH_LENGTH] = {0};
+    char tmpPath[MAX_PATH_LENGTH] = {0};
+    char status[20] = {0};
+    int percent, currentNow, voltageNow, powerNow;
+    bool isWatts = false;
 
-	char basePath[100] = {0};
-	char tmpPath[100] = {0};
-	fgets(basePath, sizeof(basePath), bat);
-	pclose(bat);
+    // Get the battery base path
+    FILE* bat = popen("findbat", "r");
+    if (!bat) {
+        perror("Failed to launch findbat");
+        return 1;
+    }
 
-	if (basePath[0] == '\0') {
-		fputs("findbat returned nothind!\r\n", stderr);
-		fputs("Please look for any errors above. Likely your computer doesn't have a battery.\r\n", stderr);
-		exit(1);
-	}
+    fgets(basePath, sizeof(basePath), bat);
+    pclose(bat);
 
-	modPath(tmpPath, basePath, "/capacity");
+    if (basePath[0] == '\0') {
+        fprintf(stderr, "findbat returned nothing!\n");
+        return 1;
+    }
 
-	FILE* fh = fopen(tmpPath, "r");
-	if (fh == NULL) {
-		perror("Failed to open capacity file!");
-		return 1;
-	}
+    // Ensure basePath does not end with newline
+    size_t len = strlen(basePath);
+    if (len > 0 && basePath[len - 1] == '\n') {
+        basePath[len - 1] = '\0';
+    }
 
-	int percent;
-	fscanf(fh, "%d", &percent);
-	fclose(fh);
+    // Get battery capacity
+    if (snprintf(tmpPath, sizeof(tmpPath), "%s/capacity", basePath) >= sizeof(tmpPath)) {
+        fprintf(stderr, "Error: Path exceeds buffer size\n");
+        return 1;
+    }
+    if (readBatteryFile(tmpPath, &percent) < 0) return 1;
 
-	const char* pre = "";
-	const char* post = "\e[0m";
-	if (percent < 35) {
-		pre = "\e[1;31m!!! ";
-		post = " !!! \e[0m";
-	}
-	else if (percent <  45) {pre = "\e[31m";}
-	else if (percent <  65) {pre = "\e[1;33m";}
-	else if (percent <  75) {pre = "\e[1;32m";}
-	else if (percent >= 75) {pre = "\e[32m";}
-	printf("BAT PERCENT: %s%d%%%s\n", pre, percent, post);
+    // Determine battery status
+    if (snprintf(tmpPath, sizeof(tmpPath), "%s/status", basePath) >= sizeof(tmpPath)) {
+        fprintf(stderr, "Error: Path exceeds buffer size\n");
+        return 1;
+    }
+    FILE* statusFile = fopen(tmpPath, "r");
+    if (!statusFile) {
+        perror("Failed to read battery status");
+        return 1;
+    }
+    if (!fgets(status, sizeof(status), statusFile)) {
+        fprintf(stderr, "Failed to read status from %s\n", tmpPath);
+        fclose(statusFile);
+        return 1;
+    }
+    fclose(statusFile);
 
-	modPath(tmpPath, basePath, "/status");
-	fh = fopen(tmpPath, "r");
-	if (fh == NULL) {
-		perror("Failed to open status file!");
-		return 1;
-	}
-	char statusStr[20];
-	fscanf(fh, "%s", statusStr);
-	fclose(fh);
+    // Trim newline from status
+    len = strlen(status);
+    if (len > 0 && status[len - 1] == '\n') {
+        status[len - 1] = '\0';
+    }
 
-	if      (strcmp(statusStr, "Charging")    == 0) {pre = "\e[32m";}
-	else if (strcmp(statusStr, "Discharging") == 0) {pre = "\e[1;31m";}
-	else                                            {pre = "\e[1;33m";}
+    // Update color coding based on percent and status
+    if (strcmp(status, "Discharging") == 0) {
+        if (percent < 35) {
+            pre = "\e[1;31m!!! ";
+            post = " !!! \e[0m";
+        } else if (percent < 65) {
+            pre = "\e[31m";
+        } else if (percent < 85) {
+            pre = "\e[1;33m";
+        } else {
+            pre = "\e[1;32m";
+        }
+    } else { // Charging or Full
+        pre = "\e[1;32m";
+    }
 
-	modPath(tmpPath, basePath, "/current_now");
-	fh = fopen(tmpPath, "r");
-	if (fh == NULL) {
-		printf("Failed to open current file!\n");
-		return 1;
-	}
-	int currentNow;
-	fscanf(fh, "%d", &currentNow);
-	fclose(fh);
+    printf("BAT PERCENT: %s%d%%%s\n", pre, percent, post);
 
-	if (currentNow < 1000000 && currentNow > 0) {pre = "\e[1;33mSlow ";}
-	printf("BAT STATUS : %s%s\e[0m\n", pre, statusStr);
+    // Attempt to read power_now
+    if (snprintf(tmpPath, sizeof(tmpPath), "%s/power_now", basePath) >= sizeof(tmpPath)) {
+        fprintf(stderr, "Error: Path exceeds buffer size\n");
+        return 1;
+    }
+    if (readBatteryFile(tmpPath, &powerNow) == 0) {
+        isWatts = true;
+    } else {
+        // Fallback to current_now and voltage_now
+        if (snprintf(tmpPath, sizeof(tmpPath), "%s/current_now", basePath) >= sizeof(tmpPath)) {
+            fprintf(stderr, "Error: Path exceeds buffer size\n");
+            return 1;
+        }
+        if (readBatteryFile(tmpPath, &currentNow) < 0) return 1;
 
-	// print the battery current nicely
-	// step 1: reverse the negative (and log it for later) to make the math easier
+        if (snprintf(tmpPath, sizeof(tmpPath), "%s/voltage_now", basePath) >= sizeof(tmpPath)) {
+            fprintf(stderr, "Error: Path exceeds buffer size\n");
+            return 1;
+        }
+        if (readBatteryFile(tmpPath, &voltageNow) < 0) return 1;
 
-	pre = "\e[1;31m";
-	// currentNow = 1000000;
-	bool negative = false;
-	bool amps = false;
-	if (currentNow < 0) {currentNow = -currentNow; negative = true;}
+        powerNow = (int)(calculateWatts(currentNow, voltageNow) * 1000000); // Convert W to µW
+        isWatts = true;
+    }
 
-	// step 1: detect if it is more than 1A
+    // Adjust sign for discharging
+    if (strcmp(status, "Discharging") == 0) {
+        powerNow = -abs(powerNow);
+        post = "\e[0m";
 
-	if (currentNow > 1000000) {amps = true;}
+        // > 2W discharge
+        if (isWatts && powerNow <= -2) {
+        	pre = "\e[1;31m";
+        }
+        else if (isWatts && powerNow <= -1) {
+			pre = "\e[31m";
+		}
+		else if (powerNow <= -500) {
+			pre = "\e[1;33m";
+		}
+		else {
+			pre = "\e[1;32m";
+		}
 
-	// step 2: colors
-	if (!negative) {
-		// > 1000mA
-		if (currentNow >= 1000000) {pre = "\e[1;33m";}
-		// > 1500mA
-		if (currentNow >= 1500000) {pre = "\e[1;32m";}
-		// > 2000mA
-		if (currentNow >= 2000000) {pre = "\e[32m";}
-	}
+    }
 
-	// step 3: print it
-	currentNow /= 1000;
+    // Format the output
+    double displayPower = isWatts ? (powerNow / 1000000.0) : powerNow;
+    const char* unit = isWatts ? "W" : "mW";
 
-	char str[48];
-	sprintf(str, "BAT CURRENT: %s%s%.2f", pre, negative ? "-" : "", amps ? (double)((double)currentNow / (double)1000) : (double)currentNow);
+    printf("BAT POWER  : %s%.2f %s%s\n", pre, displayPower, unit, post);
 
-	int l = strlen(str);
-	if (str[l-1] == '0' && str[l-2] == '0' && str[l-3] == '.') {
-		str[strlen(str) - 3] = '\0';
-	}
-
-	printf("%s%s\x1b[0m\r\n", str, amps ? "A" : "mA");
-
-	return 0;
+    return 0;
 }
